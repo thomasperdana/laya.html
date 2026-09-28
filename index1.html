@@ -489,12 +489,88 @@
       .calc-results { grid-template-columns: 1fr; }
       .avoid-row { flex-direction: column; }
     }
+
+    /* ─── CROSS-NAVIGATION HUB ─── */
+    .cross-nav-hub {
+      background: #05080e;
+      border-bottom: 1px solid var(--border);
+      padding: 0.45rem 1.5rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      position: sticky;
+      top: 0;
+      z-index: 950;
+      backdrop-filter: blur(12px);
+    }
+    [data-theme="light"] .cross-nav-hub { background: #eef2f6; }
+    .cross-nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+    .cross-nav-links {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+    .cross-nav-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.65rem;
+      border-radius: 20px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.74rem;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      background: var(--bg-surface);
+      transition: color .2s, border-color .2s;
+    }
+    .cross-nav-pill:hover {
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+    .cross-nav-pill.active {
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent-blue);
+      border-color: var(--accent-blue);
+    }
   </style>
 </head>
 <body>
 
+<!-- ─── 2-WAY CROSS-NAVIGATION HUB ─── -->
+<div class="cross-nav-hub">
+  <div class="cross-nav-inner">
+    <div>
+      <strong style="color: var(--text-primary);">WORKSPACE HUB:</strong>
+      <span>Autonomous Quant &amp; AI Systems</span>
+    </div>
+    <div class="cross-nav-links">
+      <a href="index.html" class="cross-nav-pill">
+        <span>⚡</span>
+        <span>Crypto Trading System (index.html)</span>
+      </a>
+      <a href="index1.html" class="cross-nav-pill active">
+        <span>📖</span>
+        <span>Laya Quick Explainer (index1.html)</span>
+      </a>
+      <a href="index2.html" class="cross-nav-pill">
+        <span>🏛️</span>
+        <span>Laya &amp; UltraFast Council Guide (index2.html)</span>
+      </a>
+    </div>
+  </div>
+</div>
+
 <!-- ── NAV ── -->
-<nav aria-label="Main navigation">
+<nav aria-label="Main navigation" style="top: 36px;">
   <div class="nav-inner">
     <a href="#hero" class="nav-brand">Laya ⚡</a>
     <div class="nav-links" role="list">
