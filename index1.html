@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <!-- ============================================================
+  LAYA-EXPLAINER v1.0 | 2026-09-27
+  ⚠️ VERIFY LIST (open items — check before publishing):
+  1. Laya language count ("100+") — verify at https://github.com/NandhaKishorM/laya
+  2. Laya checkpoint availability on HuggingFace — verify model names/tags
+  3. Exact supported task types (choice/score/yes-no) — verify API surface from repo
+  4. jev-ultrafast origin — what is it? Jina? Community? Verify from laya-ultrafast README
+  5. laya-ultrafast optimization strategy (batching?) — verify from repo README
+  6. All latency/throughput figures below are ILLUSTRATIVE — replace with real benchmarks from repo
+  ============================================================ -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laya & laya-ultrafast — Explained</title>
+  <meta name="description" content="A clear, interactive explainer for the Laya non-autoregressive decision engine and its laya-ultrafast sibling. Understand both repos in 30 minutes.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── DESIGN SYSTEM ── */
+    :root {
+      --bg-primary:   #0d1117;
+      --bg-surface:   #161b22;
+      --bg-card:      #21262d;
+      --bg-code:      #161b22;
+      --accent-blue:  #58a6ff;
+      --accent-green: #3fb950;
+      --accent-amber: #d29922;
+      --accent-purple:#a371f7;
+      --accent-red:   #f85149;
+      --text-primary: #e6edf3;
+      --text-muted:   #8b949e;
+      --border:       #30363d;
+      --border-hover: #58a6ff44;
+      --shadow:       0 4px 24px rgba(0,0,0,.4);
+      --radius:       12px;
+      --radius-sm:    6px;
+    }
+    [data-theme="light"] {
+      --bg-primary:   #ffffff;
+      --bg-surface:   #f6f8fa;
+      --bg-card:      #ffffff;
+      --bg-code:      #f6f8fa;
+      --text-primary: #24292f;
+      --text-muted:   #57606a;
+      --border:       #d0d7de;
+      --border-hover: #0969da44;
+      --shadow:       0 4px 24px rgba(0,0,0,.08);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; font-size: 16px; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.7;
+      transition: background .25s, color .25s;
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .nav-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: .75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .nav-brand {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--accent-blue);
+      text-decoration: none;
+      white-space: nowrap;
+      letter-spacing: -.3px;
+    }
+    .nav-links {
+      display: flex;
+      gap: .25rem;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+    .nav-links a {
+      font-size: .8rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: .3rem .6rem;
+      border-radius: var(--radius-sm);
+      transition: color .2s, background .2s;
+      white-space: nowrap;
+    }
+    .nav-links a:hover, .nav-links a.active {
+      color: var(--text-primary);
+      background: var(--bg-card);
+    }
+    .nav-controls { display: flex; gap: .5rem; align-items: center; margin-left: auto; }
+    .icon-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: .35rem .6rem;
+      font-size: .8rem;
+      transition: color .2s, border-color .2s, background .2s;
+      display: flex; align-items: center; gap: .3rem;
+    }
+    .icon-btn:hover { color: var(--text-primary); border-color: var(--accent-blue); background: var(--bg-card); }
+    .icon-btn:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+
+    /* ── LAYOUT ── */
+    main { max-width: 960px; margin: 0 auto; padding: 0 1.5rem 4rem; }
+    section { padding: 4rem 0 2rem; border-bottom: 1px solid var(--border); }
+    section:last-of-type { border-bottom: none; }
+
+    /* ── TYPOGRAPHY ── */
+    h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 700; line-height: 1.15; letter-spacing: -.5px; }
+    h2 { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; line-height: 1.25; letter-spacing: -.3px; margin-bottom: 1.25rem; }
+    h3 { font-size: 1.2rem; font-weight: 600; margin-bottom: .75rem; }
+    h4 { font-size: 1rem; font-weight: 600; margin-bottom: .5rem; }
+    p { margin-bottom: 1rem; color: var(--text-primary); }
+    p:last-child { margin-bottom: 0; }
+    a { color: var(--accent-blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { font-weight: 600; color: var(--text-primary); }
+    em { color: var(--text-muted); }
+
+    /* ── HERO ── */
+    #hero { padding-top: 5rem; border-bottom: 1px solid var(--border); }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 100px; padding: .3rem .9rem;
+      font-size: .78rem; color: var(--text-muted);
+      margin-bottom: 1.5rem;
+    }
+    .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); }
+    .hero-subtitle {
+      font-size: 1.15rem; color: var(--text-muted); margin: 1rem 0 2rem;
+      max-width: 640px; line-height: 1.6;
+    }
+    .hero-cards {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+      margin: 2rem 0;
+    }
+    @media (max-width: 600px) { .hero-cards { grid-template-columns: 1fr; } }
+    .repo-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.25rem 1.5rem;
+      transition: border-color .2s, transform .2s, box-shadow .2s;
+    }
+    .repo-card:hover { border-color: var(--accent-blue); transform: translateY(-2px); box-shadow: var(--shadow); }
+    .repo-card .tag {
+      font-size: .72rem; font-weight: 600; letter-spacing: .5px;
+      text-transform: uppercase; color: var(--accent-purple);
+      margin-bottom: .4rem; display: block;
+    }
+    .repo-card h3 { font-size: 1rem; margin-bottom: .4rem; }
+    .repo-card p { font-size: .88rem; color: var(--text-muted); margin: 0; }
+
+    .fast-track {
+      background: linear-gradient(135deg, var(--accent-purple)22, var(--accent-blue)22);
+      border: 1px solid var(--accent-purple)55;
+      border-radius: var(--radius); padding: 1rem 1.25rem;
+      margin-top: 1.5rem; display: flex; align-items: center; gap: .75rem;
+      font-size: .88rem;
+    }
+    .fast-track-icon { font-size: 1.25rem; }
+    .fast-track strong { color: var(--accent-purple); }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 1rem; }
+
+    /* ── CALLOUT ── */
+    .callout {
+      border-radius: var(--radius); padding: 1rem 1.25rem;
+      margin: 1.25rem 0; font-size: .92rem;
+      border-left: 4px solid;
+    }
+    .callout-info { background: var(--accent-blue)11; border-color: var(--accent-blue); }
+    .callout-warn { background: var(--accent-amber)11; border-color: var(--accent-amber); }
+    .callout-tip  { background: var(--accent-green)11; border-color: var(--accent-green); }
+    .callout-red  { background: var(--accent-red)11;   border-color: var(--accent-red); }
+    .callout-title { font-weight: 600; margin-bottom: .3rem; display: block; }
+
+    /* ── VERIFY BADGE ── */
+    .verify-badge {
+      display: inline-flex; align-items: center; gap: .2rem;
+      background: var(--accent-amber)22; border: 1px solid var(--accent-amber)55;
+      color: var(--accent-amber); border-radius: 4px;
+      font-size: .72rem; padding: 1px 6px; font-weight: 500;
+      vertical-align: middle; white-space: nowrap;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── CODE ── */
+    .code-wrap { position: relative; margin: 1.25rem 0; }
+    pre {
+      background: var(--bg-code); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 1.25rem;
+      overflow-x: auto; font-size: .85rem; line-height: 1.65;
+    }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .85em;
+    }
+    p code, li code {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 5px;
+      font-size: .82em;
+    }
+    .copy-btn {
+      position: absolute; top: .6rem; right: .6rem;
+      background: var(--bg-surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text-muted);
+      cursor: pointer; font-size: .72rem; padding: .25rem .6rem;
+      transition: color .2s, border-color .2s, background .2s;
+      font-family: 'Inter', sans-serif;
+    }
+    .copy-btn:hover { color: var(--text-primary); border-color: var(--accent-blue); background: var(--bg-card); }
+    .copy-btn:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+    .code-label {
+      display: inline-block; background: var(--accent-amber)22; color: var(--accent-amber);
+      font-size: .7rem; font-weight: 600; padding: .1rem .5rem; border-radius: 3px;
+      margin-bottom: .4rem; font-family: 'JetBrains Mono', monospace;
+      letter-spacing: .5px; text-transform: uppercase;
+    }
+
+    /* Syntax highlight (manual) */
+    .kw  { color: #ff7b72; }   /* keywords */
+    .st  { color: #a5d6ff; }   /* strings */
+    .cm  { color: #8b949e; font-style: italic; } /* comments */
+    .fn  { color: #d2a8ff; }   /* function names */
+    .nu  { color: #79c0ff; }   /* numbers */
+    .op  { color: #79c0ff; }   /* operators */
+    .id  { color: #e6edf3; }   /* identifiers */
+
+    /* ── TABS ── */
+    .tab-group { margin: 1.25rem 0; }
+    .tab-list {
+      display: flex; gap: 0; border-bottom: 1px solid var(--border);
+      margin-bottom: 1.25rem; overflow-x: auto;
+    }
+    .tab-btn {
+      background: transparent; border: none; border-bottom: 2px solid transparent;
+      color: var(--text-muted); cursor: pointer; font-family: 'Inter', sans-serif;
+      font-size: .88rem; font-weight: 500; padding: .6rem 1.1rem;
+      transition: color .2s, border-color .2s; white-space: nowrap;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text-primary); }
+    .tab-btn[aria-selected="true"] { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+    .tab-btn:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; border-radius: 4px 4px 0 0; }
+    .tab-panel { display: none; }
+    .tab-panel[aria-hidden="false"], .tab-panel.active { display: block; }
+
+    /* ── TABLE ── */
+    .table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    th {
+      background: var(--bg-card); color: var(--text-muted);
+      font-weight: 600; font-size: .78rem; letter-spacing: .5px; text-transform: uppercase;
+      padding: .6rem 1rem; text-align: left; border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: .65rem 1rem; border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg-card)88; }
+    .check { color: var(--accent-green); font-weight: 700; }
+    .cross { color: var(--accent-red); }
+    .partial { color: var(--accent-amber); }
+
+    /* ── FAQ ── */
+    .faq-item {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: .6rem; overflow: hidden;
+      transition: border-color .2s;
+    }
+    .faq-item:hover { border-color: var(--border-hover); }
+    .faq-summary {
+      cursor: pointer; font-weight: 600; font-size: .95rem;
+      padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg-card); list-style: none; gap: .75rem;
+      transition: background .2s;
+    }
+    .faq-summary::-webkit-details-marker { display: none; }
+    .faq-summary:hover { background: var(--bg-surface); }
+    .faq-chevron {
+      flex-shrink: 0; width: 18px; height: 18px; color: var(--text-muted);
+      transition: transform .3s; display: inline-block;
+    }
+    details[open] .faq-summary .faq-chevron { transform: rotate(180deg); }
+    details[open] .faq-summary { background: var(--bg-surface); }
+    .faq-body { padding: 1rem 1.25rem; font-size: .92rem; color: var(--text-muted); line-height: 1.7; }
+    .faq-body p:last-child { margin: 0; }
+
+    /* ── GLOSSARY ── */
+    .glossary-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr));
+      gap: .75rem;
+    }
+    .gloss-item {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: .9rem 1rem;
+      transition: border-color .2s;
+    }
+    .gloss-item:hover { border-color: var(--accent-purple)55; }
+    .gloss-term { font-weight: 600; color: var(--accent-purple); font-size: .88rem; margin-bottom: .25rem; display: block; }
+    .gloss-def { font-size: .83rem; color: var(--text-muted); line-height: 1.5; }
+
+    /* ── TOOLTIP ── */
+    .term {
+      border-bottom: 1px dashed var(--accent-purple);
+      cursor: help; color: inherit; position: relative;
+    }
+    .tooltip {
+      display: none; position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%);
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: .5rem .75rem;
+      font-size: .78rem; line-height: 1.45; color: var(--text-primary);
+      min-width: 180px; max-width: 280px; z-index: 200;
+      box-shadow: var(--shadow); pointer-events: none; white-space: normal;
+    }
+    .tooltip::after {
+      content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+      border: 5px solid transparent; border-top-color: var(--border);
+    }
+    .term:hover .tooltip, .term:focus .tooltip { display: block; }
+
+    /* ── TIPS GRID ── */
+    .tips-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 1rem; }
+    .tip-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.15rem 1.25rem;
+    }
+    .tip-card .tip-icon { font-size: 1.5rem; margin-bottom: .5rem; display: block; }
+    .tip-card h4 { font-size: .92rem; margin-bottom: .35rem; }
+    .tip-card p  { font-size: .84rem; color: var(--text-muted); margin: 0; }
+
+    /* ── AVOID ── */
+    .avoid-item {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-left: 4px solid var(--accent-red);
+      border-radius: var(--radius); padding: 1.15rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .avoid-item h4 { color: var(--accent-red); margin-bottom: .5rem; }
+    .avoid-row { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: .5rem; }
+    .avoid-col { flex: 1; min-width: 160px; }
+    .avoid-col .label { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: .25rem; }
+    .avoid-col p { font-size: .84rem; color: var(--text-muted); margin: 0; }
+
+    /* ── VERIFY PANEL ── */
+    .verify-panel {
+      background: var(--accent-amber)11; border: 1px solid var(--accent-amber)44;
+      border-radius: var(--radius); overflow: hidden; margin-top: 1.25rem;
+    }
+    .verify-summary {
+      cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+      padding: 1rem 1.25rem; font-weight: 600; font-size: .92rem; color: var(--accent-amber);
+      list-style: none;
+    }
+    .verify-summary::-webkit-details-marker { display: none; }
+    .verify-body { padding: 1rem 1.25rem; }
+    .verify-list { list-style: none; display: flex; flex-direction: column; gap: .6rem; }
+    .verify-list li {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: .7rem 1rem; font-size: .85rem;
+    }
+    .verify-list li strong { color: var(--accent-amber); }
+    .verify-list li a { color: var(--accent-blue); }
+
+    /* ── CALCULATOR WIDGET ── */
+    .calc-widget {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem; margin-top: 1.25rem;
+    }
+    .calc-widget h4 { margin-bottom: 1rem; color: var(--accent-blue); }
+    .calc-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; flex-wrap: wrap; }
+    .calc-row label { font-size: .85rem; color: var(--text-muted); min-width: 200px; }
+    .calc-row input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent-blue); }
+    .calc-row .val { font-family: 'JetBrains Mono', monospace; font-size: .85rem; min-width: 60px; color: var(--accent-blue); }
+    .calc-results {
+      margin-top: 1rem; display: grid; grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+    }
+    .calc-result-item {
+      background: var(--bg-surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: .75rem 1rem;
+    }
+    .calc-result-item .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: .25rem; }
+    .calc-result-item .value { font-size: 1.2rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .calc-note { font-size: .75rem; color: var(--text-muted); margin-top: .75rem; }
+
+    /* ── SVG FIGURES ── */
+    .fig-wrap { margin: 1.5rem 0; }
+    .fig-wrap svg { width: 100%; height: auto; display: block; }
+    .fig-caption { font-size: .82rem; color: var(--text-muted); margin-top: .6rem; text-align: center; }
+    .fig-notice { font-size: .8rem; color: var(--accent-blue); margin-top: .25rem; text-align: center; }
+
+    /* ── STEP LIST ── */
+    .step-list { list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: .75rem; }
+    .step-list li {
+      counter-increment: step;
+      display: flex; align-items: flex-start; gap: 1rem;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1rem 1.25rem;
+    }
+    .step-list li::before {
+      content: counter(step);
+      background: var(--accent-blue); color: #fff;
+      border-radius: 50%; width: 28px; height: 28px; min-width: 28px;
+      font-size: .8rem; font-weight: 700; display: flex; align-items: center;
+      justify-content: center; margin-top: .1rem;
+    }
+
+    /* ── LINKS GRID ── */
+    .links-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 1rem; }
+    .link-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.25rem;
+      display: flex; flex-direction: column; gap: .4rem;
+      transition: border-color .2s, transform .2s;
+      text-decoration: none;
+    }
+    .link-card:hover { border-color: var(--accent-blue); transform: translateY(-2px); }
+    .link-card .link-icon { font-size: 1.4rem; }
+    .link-card .link-title { font-weight: 600; color: var(--accent-blue); font-size: .95rem; }
+    .link-card .link-desc { font-size: .82rem; color: var(--text-muted); }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border); padding: 2rem 1.5rem;
+      max-width: 960px; margin: 0 auto;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;
+    }
+    footer p { font-size: .8rem; color: var(--text-muted); margin: 0; }
+    footer a { color: var(--text-muted); }
+    footer a:hover { color: var(--accent-blue); }
+
+    /* ── UTILITY ── */
+    .label-blue   { color: var(--accent-blue); }
+    .label-green  { color: var(--accent-green); }
+    .label-amber  { color: var(--accent-amber); }
+    .label-purple { color: var(--accent-purple); }
+    .muted { color: var(--text-muted); }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .section-intro { font-size: 1rem; color: var(--text-muted); margin-bottom: 1.75rem; max-width: 680px; }
+    .tag-pill {
+      display: inline-block; border-radius: 100px; padding: .15rem .7rem;
+      font-size: .72rem; font-weight: 600; letter-spacing: .3px;
+    }
+    .tag-blue   { background: var(--accent-blue)22;   color: var(--accent-blue); }
+    .tag-green  { background: var(--accent-green)22;  color: var(--accent-green); }
+    .tag-purple { background: var(--accent-purple)22; color: var(--accent-purple); }
+    .tag-amber  { background: var(--accent-amber)22;  color: var(--accent-amber); }
+
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .hero-cards { grid-template-columns: 1fr; }
+      .calc-results { grid-template-columns: 1fr; }
+      .avoid-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="#hero" class="nav-brand">Laya ⚡</a>
+    <div class="nav-links" role="list">
+      <a href="#what-is-laya" role="listitem">What is Laya?</a>
+      <a href="#architecture" role="listitem">Architecture</a>
+      <a href="#how-it-works" role="listitem">How it Works</a>
+      <a href="#laya-ultrafast" role="listitem">laya-ultrafast</a>
+      <a href="#comparison" role="listitem">Compare</a>
+      <a href="#tips" role="listitem">Tips</a>
+      <a href="#faq" role="listitem">FAQ</a>
+      <a href="#glossary" role="listitem">Glossary</a>
+      <a href="#links" role="listitem">Links</a>
+    </div>
+    <div class="nav-controls">
+      <button class="icon-btn" id="theme-toggle" aria-label="Toggle light/dark mode" title="Toggle theme">
+        <span id="theme-icon">☀️</span> <span id="theme-label">Light</span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ── HERO ── -->
+  <section id="hero" aria-labelledby="hero-heading">
+    <div class="hero-badge"><span class="dot"></span> Open-source ML · GitHub</div>
+    <h1 id="hero-heading">Laya &amp; laya-ultrafast<br><span class="label-blue">Explained</span></h1>
+    <p class="hero-subtitle">
+      Two repos. One fast non-autoregressive decision engine and its speed-optimized sibling.
+      Understand both in 30 minutes — no ML PhD required.
+    </p>
+
+    <div class="hero-cards">
+      <div class="repo-card">
+        <span class="tag">Repo 1</span>
+        <h3>NandhaKishorM / laya</h3>
+        <p>A <span class="term">non-autoregressive<span class="tooltip">Scores all outputs in one step — no token-by-token generation. Dramatically faster for classification tasks.</span></span> System 1 decision engine for typed choice, score (0–1), and yes/no decisions over any text, in a single forward pass, in 100+ languages. <span class="verify-badge">⚠️ Verify</span></p>
+        <div style="margin-top:.75rem;">
+          <a href="https://github.com/NandhaKishorM/laya" target="_blank" rel="noopener" class="tag-pill tag-blue">github.com/NandhaKishorM/laya ↗</a>
+        </div>
+      </div>
+      <div class="repo-card">
+        <span class="tag">Repo 2</span>
+        <h3>ipenywis / laya-ultrafast</h3>
+        <p>"Same as <span class="term">jev-ultrafast<span class="tooltip">A community ultrafast inference pattern/benchmark — origin unconfirmed. ⚠️ Verify from the repo README.</span></span> but using Laya." An ultrafast inference wrapper that applies the jev-ultrafast speed pattern to the Laya model backend. <span class="verify-badge">⚠️ Verify</span></p>
+        <div style="margin-top:.75rem;">
+          <a href="https://github.com/ipenywis/laya-ultrafast" target="_blank" rel="noopener" class="tag-pill tag-purple">github.com/ipenywis/laya-ultrafast ↗</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="fast-track">
+      <span class="fast-track-icon">⚡</span>
+      <div>
+        <strong>30-minute fast track:</strong> Read <em>What is Laya?</em> → <em>Architecture</em> → <em>How it Works</em> → <em>Compare</em>. That's the core. Everything else deepens it.
+      </div>
+    </div>
+  </section>
+
+  <!-- ── WHAT IS LAYA ── -->
+  <section id="what-is-laya" aria-labelledby="what-heading">
+    <h2 id="what-heading">What is Laya?</h2>
+    <p class="section-intro">Laya solves a very common problem — classifying text — in an unusually fast way. Here's the idea in plain English.</p>
+
+    <div class="tab-group" role="tablist" aria-label="Explanation depth">
+      <div class="tab-list">
+        <button class="tab-btn" role="tab" aria-selected="true" aria-controls="tab-analogy" id="btn-analogy">The Analogy</button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-ml" id="btn-ml">The ML Detail</button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-router" id="btn-router">The Router</button>
+      </div>
+
+      <div id="tab-analogy" role="tabpanel" aria-labelledby="btn-analogy" class="tab-panel active" aria-hidden="false">
+        <div class="callout callout-info">
+          <span class="callout-title">💡 The best analogy</span>
+          Imagine you have 50 bins labelled with different emotions. Two approaches:
+          <br><br>
+          <strong>Autoregressive (GPT-style):</strong> Write out a long essay about the text, then eventually say which bin it belongs to — one word at a time, slow.
+          <br><br>
+          <strong>Non-autoregressive (Laya):</strong> Glance at all 50 bins simultaneously, score each in one instant, hand you the winner. Like a reflex — no deliberation needed.
+        </div>
+        <p>This is why Laya is described as a <strong>System 1</strong> decision engine. In cognitive science, <span class="term">System 1<span class="tooltip">Daniel Kahneman's framework: System 1 = fast, automatic, instinctive. System 2 = slow, deliberate, analytical.</span></span> thinking is fast and instinctive, while System 2 is slow and deliberate. Laya is the ML equivalent for classification tasks — instant, parallel, no generation required.</p>
+
+        <h3>Three task types</h3>
+        <div class="card-grid">
+          <div class="card">
+            <h4>📋 Typed Choice</h4>
+            <p class="muted" style="font-size:.88rem;">Pick exactly one label from a fixed set you provide. <em>Example: classify this tweet as "positive", "negative", or "neutral".</em></p>
+          </div>
+          <div class="card">
+            <h4>📊 Score (0–1)</h4>
+            <p class="muted" style="font-size:.88rem;">Return a continuous confidence for a statement about the text. <em>Example: how toxic is this comment? Returns 0.0–1.0.</em></p>
+          </div>
+          <div class="card">
+            <h4>✅ Yes / No</h4>
+            <p class="muted" style="font-size:.88rem;">Binary classification: does this text match a condition? <em>Example: is this question about billing? Yes or No.</em></p>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-ml" role="tabpanel" aria-labelledby="btn-ml" class="tab-panel" aria-hidden="true">
+        <p>At the ML level, Laya is a <span class="term">non-autoregressive<span class="tooltip">The model computes all output positions simultaneously, rather than conditioning each token on the previous one.</span></span> classification model built on a pre-trained language encoder.</p>
+        <h3>How it differs from a generative model</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Property</th><th>Generative LLM (e.g. GPT)</th><th>Laya</th></tr></thead>
+            <tbody>
+              <tr><td>Output style</td><td>One token at a time (autoregressive)</td><td>All labels scored in one pass</td></tr>
+              <tr><td>Decoding steps</td><td>O(output length)</td><td>O(1) — constant</td></tr>
+              <tr><td>Output type</td><td>Free text</td><td>Label, score, or boolean</td></tr>
+              <tr><td>Speed for classification</td><td class="cross">Slow</td><td class="check">Fast</td></tr>
+              <tr><td>Can generate paragraphs</td><td class="check">Yes</td><td class="cross">No — classification only</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The key insight: for classification, you don't need to <em>generate</em> text. You only need to <em>score</em> candidates. Laya exploits this to eliminate the autoregressive bottleneck entirely.</p>
+      </div>
+
+      <div id="tab-router" role="tabpanel" aria-labelledby="btn-router" class="tab-panel" aria-hidden="true">
+        <p>Laya includes a <span class="term">router<span class="tooltip">A lightweight dispatcher that inspects each incoming request and selects the appropriate model checkpoint to handle it.</span></span> — a component that automatically selects the right model <span class="term">checkpoint<span class="tooltip">A saved set of model weights trained for a specific task type or domain.</span></span> for each request.</p>
+        <div class="callout callout-tip">
+          <span class="callout-title">✅ Why this matters</span>
+          Different classification tasks may benefit from different fine-tuned checkpoints. Instead of forcing the caller to know which model to use, the router dispatches automatically — so the same API entry point handles choice, score, and yes/no tasks without extra configuration. <span class="verify-badge">⚠️ Verify router behavior from README</span>
+        </div>
+        <p>This design means you can add new checkpoint specializations without changing the API surface, and the router can balance load across checkpoints if needed.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ARCHITECTURE ── -->
+  <section id="architecture" aria-labelledby="arch-heading">
+    <h2 id="arch-heading">Architecture</h2>
+    <p class="section-intro">FIG-1 shows how Laya processes a single classification request in one forward pass.</p>
+
+    <div class="fig-wrap">
+      <!-- FIG-1: Laya non-autoregressive forward pass -->
+      <svg viewBox="0 0 800 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Laya architecture: input text flows through a router to select a checkpoint, then the encoder scores all labels simultaneously in one forward pass, returning the winning label and confidence score." style="background:#161b22;border-radius:12px;border:1px solid #30363d;">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#58a6ff"/>
+          </marker>
+        </defs>
+
+        <!-- Input box -->
+        <rect x="20" y="100" width="130" height="60" rx="8" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+        <text x="85" y="126" text-anchor="middle" fill="#8b949e" font-size="10" font-family="Inter,sans-serif" font-weight="600" letter-spacing="0.5">INPUT TEXT</text>
+        <text x="85" y="144" text-anchor="middle" fill="#e6edf3" font-size="11" font-family="JetBrains Mono,monospace">"Great product!"</text>
+
+        <!-- Arrow to Router -->
+        <line x1="150" y1="130" x2="200" y2="130" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+
+        <!-- Router box -->
+        <rect x="200" y="100" width="110" height="60" rx="8" fill="#21262d" stroke="#a371f7" stroke-width="1.5"/>
+        <text x="255" y="124" text-anchor="middle" fill="#a371f7" font-size="10" font-family="Inter,sans-serif" font-weight="600" letter-spacing="0.5">ROUTER</text>
+        <text x="255" y="141" text-anchor="middle" fill="#8b949e" font-size="10" font-family="Inter,sans-serif">picks checkpoint</text>
+
+        <!-- Arrow to Encoder -->
+        <line x1="310" y1="130" x2="360" y2="130" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+
+        <!-- Encoder box -->
+        <rect x="360" y="80" width="140" height="100" rx="8" fill="#21262d" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="430" y="106" text-anchor="middle" fill="#3fb950" font-size="10" font-family="Inter,sans-serif" font-weight="600" letter-spacing="0.5">ENCODER</text>
+        <text x="430" y="123" text-anchor="middle" fill="#8b949e" font-size="10" font-family="Inter,sans-serif">single forward pass</text>
+        <text x="430" y="140" text-anchor="middle" fill="#58a6ff" font-size="9" font-family="Inter,sans-serif">scores ALL labels</text>
+        <text x="430" y="156" text-anchor="middle" fill="#58a6ff" font-size="9" font-family="Inter,sans-serif">simultaneously ↓</text>
+
+        <!-- Arrow to Output -->
+        <line x1="500" y1="130" x2="550" y2="130" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+
+        <!-- Output box -->
+        <rect x="550" y="90" width="150" height="80" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+        <text x="625" y="114" text-anchor="middle" fill="#58a6ff" font-size="10" font-family="Inter,sans-serif" font-weight="600" letter-spacing="0.5">OUTPUT</text>
+        <text x="625" y="133" text-anchor="middle" fill="#e6edf3" font-size="12" font-family="JetBrains Mono,monospace" font-weight="500">"positive"</text>
+        <text x="625" y="152" text-anchor="middle" fill="#3fb950" font-size="11" font-family="JetBrains Mono,monospace">score: 0.94</text>
+
+        <!-- Labels scored simultaneously (small dots under encoder) -->
+        <text x="430" y="220" text-anchor="middle" fill="#8b949e" font-size="9" font-family="Inter,sans-serif">positive · negative · neutral — all scored at once</text>
+        <circle cx="360" cy="210" r="4" fill="#3fb950" opacity="0.7"/>
+        <circle cx="395" cy="210" r="4" fill="#f85149" opacity="0.5"/>
+        <circle cx="430" cy="210" r="4" fill="#8b949e" opacity="0.4"/>
+        <line x1="360" y1="205" x2="430" y2="183" stroke="#3fb950" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+        <line x1="395" y1="205" x2="430" y2="183" stroke="#f85149" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+        <line x1="430" y1="205" x2="430" y2="183" stroke="#8b949e" stroke-width="1" stroke-dasharray="3,3" opacity="0.3"/>
+
+        <!-- O(1) label -->
+        <text x="430" y="248" text-anchor="middle" fill="#d29922" font-size="10" font-family="JetBrains Mono,monospace">O(1) decoding — constant time regardless of label count</text>
+      </svg>
+      <p class="fig-caption"><strong>FIG-1.</strong> Laya's non-autoregressive forward pass. Input text enters the router, which selects a checkpoint. The encoder scores all candidate labels in a single pass — not one at a time.</p>
+      <p class="fig-notice">💡 What to notice: the "scores ALL labels simultaneously" step is what makes Laya fast. A generative model would loop N times for N labels; Laya does it in one shot.</p>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS ── -->
+  <section id="how-it-works" aria-labelledby="how-heading">
+    <h2 id="how-heading">How it Works</h2>
+    <p class="section-intro">A step-by-step walkthrough of a single request, from your code to a classification result.</p>
+
+    <ol class="step-list">
+      <li><div><strong>Send your text and task type.</strong> You call the Laya API with your input text and specify the task: typed choice (fixed labels), score (0–1), or yes/no.</div></li>
+      <li><div><strong>The router selects a checkpoint.</strong> Laya's router inspects the request and picks the most appropriate <span class="term">checkpoint<span class="tooltip">A saved set of model weights fine-tuned for a specific task or domain.</span></span> for the task. No manual model selection needed. <span class="verify-badge">⚠️ Verify</span></div></li>
+      <li><div><strong>The encoder runs one forward pass.</strong> Your text is tokenized and fed through the neural network encoder. This happens exactly once — no loops, no generation steps.</div></li>
+      <li><div><strong>All labels are scored simultaneously.</strong> The encoder's final representation is compared against all candidate labels in parallel, producing a confidence score for each.</div></li>
+      <li><div><strong>You get the winner (and its score).</strong> The highest-confidence label is returned, along with its score. For yes/no tasks, the answer is simply the label with &gt;50% confidence.</div></li>
+    </ol>
+
+    <h3 style="margin-top:2rem;">Code example</h3>
+    <p class="muted" style="font-size:.88rem;">The API below is <strong>illustrative</strong> — verify the actual interface from the repo README.</p>
+
+    <div class="code-label">ILLUSTRATIVE · Python</div>
+    <div class="code-wrap">
+      <button class="copy-btn" aria-label="Copy code to clipboard" data-copy="choice-example">Copy</button>
+      <pre id="choice-example"><code><span class="cm"># Install: pip install laya  (⚠️VERIFY package name from repo)</span>
+<span class="kw">from</span> <span class="id">laya</span> <span class="kw">import</span> <span class="id">Laya</span>
+
+<span class="id">client</span> <span class="op">=</span> <span class="fn">Laya</span>()
+
+<span class="cm"># --- Typed Choice ---</span>
+<span class="id">result</span> <span class="op">=</span> <span class="id">client</span><span class="op">.</span><span class="fn">choice</span>(
+    <span class="id">text</span><span class="op">=</span><span class="st">"This product is absolutely amazing!"</span>,
+    <span class="id">labels</span><span class="op">=</span>[<span class="st">"positive"</span>, <span class="st">"negative"</span>, <span class="st">"neutral"</span>]
+)
+<span class="fn">print</span>(<span class="id">result</span>)
+<span class="cm"># {"label": "positive", "score": 0.94, "latency_ms": ~20}  ← ILLUSTRATIVE</span>
+
+<span class="cm"># --- Score (0-1) ---</span>
+<span class="id">toxicity</span> <span class="op">=</span> <span class="id">client</span><span class="op">.</span><span class="fn">score</span>(
+    <span class="id">text</span><span class="op">=</span><span class="st">"Go away and never come back!"</span>,
+    <span class="id">statement</span><span class="op">=</span><span class="st">"This text is toxic"</span>
+)
+<span class="fn">print</span>(<span class="id">toxicity</span>)
+<span class="cm"># {"score": 0.81}  ← ILLUSTRATIVE</span>
+
+<span class="cm"># --- Yes/No ---</span>
+<span class="id">is_billing</span> <span class="op">=</span> <span class="id">client</span><span class="op">.</span><span class="fn">yes_no</span>(
+    <span class="id">text</span><span class="op">=</span><span class="st">"When will my invoice arrive?"</span>,
+    <span class="id">question</span><span class="op">=</span><span class="st">"Is this a billing question?"</span>
+)
+<span class="fn">print</span>(<span class="id">is_billing</span>)
+<span class="cm"># {"answer": "yes", "confidence": 0.97}  ← ILLUSTRATIVE</span></code></pre>
+    </div>
+
+    <div class="callout callout-warn">
+      <span class="callout-title">⚠️ Verify the API</span>
+      The code above is illustrative based on the repo description. The actual method names, parameters, and return shapes may differ. Always check the repo README and any linked documentation before using this in production.
+    </div>
+  </section>
+
+  <!-- ── LAYA-ULTRAFAST ── -->
+  <section id="laya-ultrafast" aria-labelledby="ultrafast-heading">
+    <h2 id="ultrafast-heading">laya-ultrafast</h2>
+    <p class="section-intro">The second repo is a speed-optimized wrapper around Laya. Here's what it adds and when to reach for it instead of plain Laya.</p>
+
+    <div class="callout callout-info">
+      <span class="callout-title">📦 What is it?</span>
+      <code>ipenywis/laya-ultrafast</code> is described as <em>"Same as jev-ultrafast but using Laya."</em>
+      It takes the <span class="term">jev-ultrafast<span class="tooltip">A community ultrafast inference pattern or benchmark. What jev-ultrafast is exactly — the original project, framework, or author — is ⚠️ unverified. Check the laya-ultrafast README.</span></span> speed pattern and applies it to the Laya model backend, producing a system optimized for maximum throughput. <span class="verify-badge">⚠️ Verify jev-ultrafast origin</span>
+    </div>
+
+    <h3>The relationship</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>laya (base)</th><th>laya-ultrafast</th></tr></thead>
+        <tbody>
+          <tr><td>Model backend</td><td>Laya</td><td>Laya</td></tr>
+          <tr><td>Primary goal</td><td>Correctness &amp; ease of use</td><td>Maximum throughput</td></tr>
+          <tr><td>Request handling</td><td>Single requests</td><td>Batched / concurrent <span class="verify-badge">⚠️ Verify</span></td></tr>
+          <tr><td>Setup complexity</td><td>Simple</td><td>Higher (more config) <span class="verify-badge">⚠️ Verify</span></td></tr>
+          <tr><td>Best for</td><td>Development, low QPS workloads</td><td>High concurrency, production at scale</td></tr>
+          <tr><td>Latency (single request)</td><td class="check">Fast</td><td class="check">Similar or better</td></tr>
+          <tr><td>Throughput (many requests)</td><td class="partial">Good</td><td class="check">Optimized <span class="verify-badge">⚠️ Verify</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="fig-wrap" style="margin-top:1.5rem;">
+      <!-- FIG-2: laya-ultrafast pipeline -->
+      <svg viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="laya-ultrafast pipeline: multiple concurrent requests enter a batch queue, are processed together by Laya inference, and results are fanned back out to callers — maximizing GPU utilization and throughput." style="background:#161b22;border-radius:12px;border:1px solid #30363d;">
+        <defs>
+          <marker id="arr2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#a371f7"/>
+          </marker>
+        </defs>
+
+        <!-- Incoming requests (stacked) -->
+        <rect x="20" y="60" width="100" height="32" rx="6" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+        <text x="70" y="81" text-anchor="middle" fill="#e6edf3" font-size="10" font-family="Inter,sans-serif">request 1</text>
+
+        <rect x="20" y="98" width="100" height="32" rx="6" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+        <text x="70" y="119" text-anchor="middle" fill="#e6edf3" font-size="10" font-family="Inter,sans-serif">request 2</text>
+
+        <rect x="20" y="136" width="100" height="32" rx="6" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+        <text x="70" y="157" text-anchor="middle" fill="#e6edf3" font-size="10" font-family="Inter,sans-serif">request N</text>
+
+        <text x="70" y="178" text-anchor="middle" fill="#8b949e" font-size="9" font-family="Inter,sans-serif">concurrent</text>
+
+        <!-- Arrows to batch queue -->
+        <line x1="120" y1="76" x2="200" y2="110" stroke="#a371f7" stroke-width="1.5" marker-end="url(#arr2)"/>
+        <line x1="120" y1="114" x2="200" y2="115" stroke="#a371f7" stroke-width="1.5" marker-end="url(#arr2)"/>
+        <line x1="120" y1="152" x2="200" y2="120" stroke="#a371f7" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+        <!-- Batch queue -->
+        <rect x="200" y="88" width="130" height="54" rx="8" fill="#21262d" stroke="#a371f7" stroke-width="1.5"/>
+        <text x="265" y="110" text-anchor="middle" fill="#a371f7" font-size="10" font-family="Inter,sans-serif" font-weight="600" letter-spacing="0.5">BATCH QUEUE</text>
+        <text x="265" y="128" text-anchor="middle" fill="#8b949e" font-size="9" font-family="Inter,sans-serif">groups requests for GPU efficiency</text>
+
+        <!-- Arrow to Laya -->
+        <line x1="330" y1="115" x2="395" y2="115" stroke="#a371f7" stroke-width="2" marker-end="url(#arr2)"/>
+
+        <!-- Laya Inference -->
+        <rect x="395" y="78" width="150" height="74" rx="8" fill="#21262d" stroke="#3fb950" stroke-width="1.5"/>
+        <text x="470" y="104" text-anchor="middle" fill="#3fb950" font-size="10" font-family="Inter,sans-serif" font-weight="600" letter-spacing="0.5">LAYA INFERENCE</text>
+        <text x="470" y="122" text-anchor="middle" fill="#8b949e" font-size="9" font-family="Inter,sans-serif">batch forward pass</text>
+        <text x="470" y="138" text-anchor="middle" fill="#58a6ff" font-size="9" font-family="Inter,sans-serif">non-autoregressive · O(1)</text>
+
+        <!-- Arrow to results -->
+        <line x1="545" y1="115" x2="610" y2="115" stroke="#a371f7" stroke-width="2" marker-end="url(#arr2)"/>
+
+        <!-- Fan out to results -->
+        <rect x="610" y="60" width="110" height="30" rx="6" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+        <text x="665" y="80" text-anchor="middle" fill="#3fb950" font-size="10" font-family="Inter,sans-serif">result 1 ✓</text>
+
+        <rect x="610" y="96" width="110" height="30" rx="6" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+        <text x="665" y="116" text-anchor="middle" fill="#3fb950" font-size="10" font-family="Inter,sans-serif">result 2 ✓</text>
+
+        <rect x="610" y="132" width="110" height="30" rx="6" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+        <text x="665" y="152" text-anchor="middle" fill="#3fb950" font-size="10" font-family="Inter,sans-serif">result N ✓</text>
+
+        <line x1="610" y1="75" x2="558" y2="108" stroke="#3fb950" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+        <line x1="610" y1="111" x2="555" y2="113" stroke="#3fb950" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+        <line x1="610" y1="147" x2="558" y2="118" stroke="#3fb950" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+
+        <!-- Label -->
+        <text x="400" y="195" text-anchor="middle" fill="#d29922" font-size="10" font-family="JetBrains Mono,monospace">Throughput ↑ — same GPU work handles N requests at once</text>
+      </svg>
+      <p class="fig-caption"><strong>FIG-2.</strong> laya-ultrafast pipeline. Concurrent requests are batched together before hitting the Laya inference engine, maximizing GPU utilization and throughput.</p>
+      <p class="fig-notice">💡 What to notice: the batch queue is the key addition. By grouping requests, laya-ultrafast amortizes the cost of each forward pass across many callers. <span class="verify-badge">⚠️ Verify batching strategy from repo</span></p>
+    </div>
+  </section>
+
+  <!-- ── COMPARISON ── -->
+  <section id="comparison" aria-labelledby="compare-heading">
+    <h2 id="compare-heading">Side-by-Side Comparison</h2>
+    <p class="section-intro">Laya, laya-ultrafast, and a generative LLM used for the same classification task.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>laya (base)</th>
+            <th>laya-ultrafast</th>
+            <th>GPT-style LLM</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Inference style</strong></td>
+            <td>Non-autoregressive</td>
+            <td>Non-autoregressive + batch opt.</td>
+            <td>Autoregressive</td>
+          </tr>
+          <tr>
+            <td><strong>Single-request latency</strong></td>
+            <td class="check">Fast</td>
+            <td class="check">Fast</td>
+            <td class="cross">Slow (O(tokens))</td>
+          </tr>
+          <tr>
+            <td><strong>High-concurrency throughput</strong></td>
+            <td class="partial">Good</td>
+            <td class="check">Optimized <span class="verify-badge">⚠️ Verify</span></td>
+            <td class="cross">Poor without careful batching</td>
+          </tr>
+          <tr>
+            <td><strong>Task types</strong></td>
+            <td>Choice, Score, Yes/No</td>
+            <td>Choice, Score, Yes/No</td>
+            <td>Any (via prompting)</td>
+          </tr>
+          <tr>
+            <td><strong>Output format</strong></td>
+            <td>Structured JSON</td>
+            <td>Structured JSON</td>
+            <td>Free text (parsing needed)</td>
+          </tr>
+          <tr>
+            <td><strong>Language support</strong></td>
+            <td>100+ <span class="verify-badge">⚠️ Verify</span></td>
+            <td>100+ (inherits Laya) <span class="verify-badge">⚠️ Verify</span></td>
+            <td>Many (model-dependent)</td>
+          </tr>
+          <tr>
+            <td><strong>Setup complexity</strong></td>
+            <td class="check">Low</td>
+            <td class="partial">Medium <span class="verify-badge">⚠️ Verify</span></td>
+            <td class="check">Low (API key only)</td>
+          </tr>
+          <tr>
+            <td><strong>Cost at scale</strong></td>
+            <td>Self-hosted / open <span class="verify-badge">⚠️ Verify</span></td>
+            <td>Self-hosted / open <span class="verify-badge">⚠️ Verify</span></td>
+            <td class="cross">Per-token pricing, high volume = expensive</td>
+          </tr>
+          <tr>
+            <td><strong>Generative tasks</strong></td>
+            <td class="cross">Not supported</td>
+            <td class="cross">Not supported</td>
+            <td class="check">Yes</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Calculator widget -->
+    <div class="calc-widget">
+      <h4>⚡ Latency Estimator <span style="font-size:.75rem;font-weight:400;color:var(--text-muted);">(ILLUSTRATIVE — replace with real benchmarks from repo)</span></h4>
+      <div class="calc-row">
+        <label for="n-labels">Number of labels to classify into:</label>
+        <input type="range" id="n-labels" min="2" max="200" value="10" step="1" aria-label="Number of labels">
+        <span class="val" id="n-labels-val">10</span>
+      </div>
+      <div class="calc-row">
+        <label for="token-len">Text length (tokens):</label>
+        <input type="range" id="token-len" min="10" max="512" value="50" step="10" aria-label="Token length">
+        <span class="val" id="token-len-val">50</span>
+      </div>
+      <div class="calc-results" id="calc-results">
+        <div class="calc-result-item">
+          <div class="label">Laya (illustrative)</div>
+          <div class="value label-green" id="laya-lat">~20 ms</div>
+        </div>
+        <div class="calc-result-item">
+          <div class="label">GPT-style LLM (illustrative)</div>
+          <div class="value label-amber" id="llm-lat">~800 ms</div>
+        </div>
+        <div class="calc-result-item">
+          <div class="label">Laya speedup (vs LLM)</div>
+          <div class="value label-blue" id="speedup">40×</div>
+        </div>
+        <div class="calc-result-item">
+          <div class="label">Laya calls/sec (illustrative)</div>
+          <div class="value" id="calls-sec">50 req/s</div>
+        </div>
+      </div>
+      <p class="calc-note">⚠️ All figures are illustrative assumptions used for demonstration. The formula: Laya latency ≈ 15ms base + 0.02ms/token (constant regardless of label count — non-autoregressive). LLM latency ≈ 200ms + 12ms × label_count. Replace with real benchmarks from the repos.</p>
+    </div>
+  </section>
+
+  <!-- ── TIPS ── -->
+  <section id="tips" aria-labelledby="tips-heading">
+    <h2 id="tips-heading">Tips &amp; Tricks</h2>
+    <p class="section-intro">Practical advice for using Laya and laya-ultrafast in real projects.</p>
+
+    <h3>💡 Tips</h3>
+    <div class="tips-grid" style="margin-bottom:2rem;">
+      <div class="tip-card">
+        <span class="tip-icon">📋</span>
+        <h4>TIP-1 · Use typed choice for fixed taxonomies</h4>
+        <p>When your label set is stable and known in advance (sentiment categories, topic tags, intent classes), typed choice gives you the fastest, most deterministic results. Avoid using the score task as a workaround for multi-label classification.</p>
+      </div>
+      <div class="tip-card">
+        <span class="tip-icon">📊</span>
+        <h4>TIP-2 · Use score for nuanced decisions</h4>
+        <p>When you need a gradient rather than a hard class — toxicity level, relevance degree, confidence of match — score (0–1) is more informative than yes/no and avoids arbitrary threshold decisions upstream.</p>
+      </div>
+      <div class="tip-card">
+        <span class="tip-icon">🔀</span>
+        <h4>TIP-3 · Let the router choose the checkpoint</h4>
+        <p>Resist the urge to pin a specific checkpoint unless you have a strong reason. The router is designed to dispatch optimally. Manual checkpoint selection can break when new checkpoints are released. <span class="verify-badge">⚠️ Verify</span></p>
+      </div>
+      <div class="tip-card">
+        <span class="tip-icon">🚀</span>
+        <h4>TIP-4 · Switch to laya-ultrafast at scale</h4>
+        <p>If your workload exceeds ~100 requests per second, laya-ultrafast's batching can significantly improve GPU utilization. Start with base Laya for development and switch when you hit throughput ceilings. <span class="verify-badge">⚠️ Verify QPS threshold from repo</span></p>
+      </div>
+    </div>
+
+    <h3>🎯 Tricks</h3>
+    <div class="card-grid">
+      <div class="card">
+        <h4>TRK-1 · Threshold score for soft yes/no</h4>
+        <p class="muted" style="font-size:.88rem;"><strong>When to use it:</strong> you need a binary decision but want control over precision/recall tradeoff.<br><strong>How:</strong> use <code>score()</code> and apply your own threshold (e.g., 0.6) rather than using <code>yes_no()</code> directly.<br><strong>What it buys:</strong> tunable sensitivity without retraining.</p>
+      </div>
+      <div class="card">
+        <h4>TRK-2 · Cache repeated labels server-side</h4>
+        <p class="muted" style="font-size:.88rem;"><strong>When to use it:</strong> you call Laya with the same fixed label set thousands of times per second.<br><strong>How:</strong> pre-compute and cache the label embeddings on the server if the API supports it. <span class="verify-badge">⚠️ Verify</span><br><strong>What it buys:</strong> reduced encoder work per request.</p>
+      </div>
+      <div class="card">
+        <h4>TRK-3 · Shakedown at <code>quick</code> depth first</h4>
+        <p class="muted" style="font-size:.88rem;"><strong>When to use it:</strong> integrating Laya into a new pipeline.<br><strong>How:</strong> run 10 representative samples and check that outputs are sensible before scaling up.<br><strong>What it buys:</strong> catches label-set mismatches and API misuse early.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── AVOID ── -->
+  <section id="avoid" aria-labelledby="avoid-heading">
+    <h2 id="avoid-heading">Things to Avoid</h2>
+    <p class="section-intro">Common mistakes that will give you poor results or unnecessary complexity.</p>
+
+    <div class="avoid-item">
+      <h4>⛔ AVD-1 · Using Laya for generative tasks</h4>
+      <div class="avoid-row">
+        <div class="avoid-col">
+          <div class="label">Symptom</div>
+          <p>You ask Laya to "summarize" or "explain" text and get back a label like "positive" — useless for your actual goal.</p>
+        </div>
+        <div class="avoid-col">
+          <div class="label">Cause</div>
+          <p>Laya is a classification engine, not a generative model. It can only output from a predefined label set, score, or yes/no.</p>
+        </div>
+        <div class="avoid-col">
+          <div class="label">Fix</div>
+          <p>Use a generative LLM (GPT-4, Claude, etc.) for tasks requiring generated text. Use Laya only when the output is a label, score, or boolean.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="avoid-item">
+      <h4>⛔ AVD-2 · Passing unbounded or dynamic label sets</h4>
+      <div class="avoid-row">
+        <div class="avoid-col">
+          <div class="label">Symptom</div>
+          <p>You pass thousands of dynamically generated labels and results become noisy or slow, contrary to expectations.</p>
+        </div>
+        <div class="avoid-col">
+          <div class="label">Cause</div>
+          <p>Laya's speed advantage assumes a reasonably fixed, known label space. Very large or ephemeral label sets can defeat the architecture's assumptions. <span class="verify-badge">⚠️ Verify label-set size limits</span></p>
+        </div>
+        <div class="avoid-col">
+          <div class="label">Fix</div>
+          <p>Define a stable label taxonomy. If the label space is unbounded, reconsider whether classification is the right approach.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="avoid-item">
+      <h4>⛔ AVD-3 · Using base Laya when throughput is the bottleneck</h4>
+      <div class="avoid-row">
+        <div class="avoid-col">
+          <div class="label">Symptom</div>
+          <p>Under high concurrent load, your Laya service is the bottleneck, GPUs are underutilized, and latency spikes.</p>
+        </div>
+        <div class="avoid-col">
+          <div class="label">Cause</div>
+          <p>Base Laya handles requests individually. Without batching, GPU compute is wasted between requests.</p>
+        </div>
+        <div class="avoid-col">
+          <div class="label">Fix</div>
+          <p>Switch to laya-ultrafast for production high-QPS workloads. Its batching layer amortizes GPU cost across concurrent requests. <span class="verify-badge">⚠️ Verify batching from repo</span></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FAQ ── -->
+  <section id="faq" aria-labelledby="faq-heading">
+    <h2 id="faq-heading">Frequently Asked Questions</h2>
+    <p class="section-intro">Real questions a developer will ask after reading about these repos.</p>
+
+    <details class="faq-item">
+      <summary class="faq-summary">
+        What does "non-autoregressive" mean in plain English?
+        <svg class="faq-chevron" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>
+      </summary>
+      <div class="faq-body">
+        <p>Most large language models generate text one token (word piece) at a time, and each token depends on all the previous ones. This is called <em>autoregressive</em> — like reading aloud one word at a time. For classification, this is inefficient.</p>
+        <p>A non-autoregressive model produces all outputs simultaneously, in one step, without sequential dependencies. Think of it like reading the entire sentence at a glance and instantly knowing the answer, rather than sounding it out word by word. For classification tasks, this makes it dramatically faster.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary class="faq-summary">
+        How is Laya different from asking GPT-4 or Claude to classify text?
+        <svg class="faq-chevron" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>
+      </summary>
+      <div class="faq-body">
+        <p>When you ask GPT-4 to classify something, it generates a text response token-by-token (often including reasoning text before the label) and you still have to parse the output. It's like hiring a novelist to answer a yes/no question — powerful but wasteful for that task.</p>
+        <p>Laya is purpose-built for classification: no generation, no parsing, structured output directly. It's typically much faster and cheaper for high-volume classification, but it cannot do anything generative (summaries, rewrites, explanations).</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary class="faq-summary">
+        What languages does Laya support?
+        <svg class="faq-chevron" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>
+      </summary>
+      <div class="faq-body">
+        <p>The repo description states "100+ languages." <span class="verify-badge">⚠️ Verify</span> The exact list and which languages are best supported likely depends on the underlying pre-trained encoder's multilingual training. Verify the exact language list from the <a href="https://github.com/NandhaKishorM/laya" target="_blank" rel="noopener">repo README</a> before relying on support for a specific language in production.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary class="faq-summary">
+        What is laya-ultrafast, and why does it exist?
+        <svg class="faq-chevron" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>
+      </summary>
+      <div class="faq-body">
+        <p>laya-ultrafast exists to maximize throughput — the number of requests the system can handle per second — rather than minimizing per-request latency. Base Laya is already fast per request, but at scale, GPU utilization can be poor if requests are handled one at a time.</p>
+        <p>laya-ultrafast applies a batching/serving optimization pattern (the "jev-ultrafast" approach <span class="verify-badge">⚠️ Verify</span>) to Laya, grouping concurrent requests before each inference call so the GPU is fully utilized.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary class="faq-summary">
+        What is "jev-ultrafast" that laya-ultrafast is based on?
+        <svg class="faq-chevron" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>
+      </summary>
+      <div class="faq-body">
+        <p><span class="verify-badge">⚠️ Unverified</span> The laya-ultrafast repo description says it is "Same as jev-ultrafast but using Laya." What jev-ultrafast is — a specific library, a benchmark pattern, or a community project — is not confirmed from publicly available metadata. Check the <a href="https://github.com/ipenywis/laya-ultrafast" target="_blank" rel="noopener">laya-ultrafast README</a> directly for a link to the original jev-ultrafast project.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary class="faq-summary">
+        Can I use Laya offline, or does it require an API?
+        <svg class="faq-chevron" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>
+      </summary>
+      <div class="faq-body">
+        <p><span class="verify-badge">⚠️ Verify checkpoint availability</span> Laya appears to be an open-source project, suggesting you can run the model locally once you have the checkpoints. Whether those checkpoints are freely available (e.g., on HuggingFace) should be verified from the repo README and any linked HuggingFace model pages. If the checkpoints are public, offline use should be possible.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary class="faq-summary">
+        How do I choose between Laya and laya-ultrafast?
+        <svg class="faq-chevron" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>
+      </summary>
+      <div class="faq-body">
+        <p><strong>Start with base Laya:</strong> for development, experimentation, and workloads under ~50–100 requests per second. Simpler setup, easier to debug.</p>
+        <p><strong>Switch to laya-ultrafast:</strong> when you're hitting throughput ceilings in production, when you need to serve many concurrent callers from a single GPU, or when you want to replicate the jev-ultrafast serving pattern. <span class="verify-badge">⚠️ Verify threshold figures from repo benchmarks</span></p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary class="faq-summary">
+        Where can I find the Laya model weights?
+        <svg class="faq-chevron" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>
+      </summary>
+      <div class="faq-body">
+        <p><span class="verify-badge">⚠️ Verify</span> Check the <a href="https://github.com/NandhaKishorM/laya" target="_blank" rel="noopener">Laya GitHub repo</a> for links to HuggingFace model pages or instructions on downloading checkpoints. The repo may include a download script or point to a HuggingFace organization. Search HuggingFace for "NandhaKishorM/laya" or "laya" to find any published checkpoints.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ── GLOSSARY ── -->
+  <section id="glossary" aria-labelledby="glossary-heading">
+    <h2 id="glossary-heading">Glossary</h2>
+    <p class="section-intro">Every ML and systems term used on this page, defined in plain English.</p>
+
+    <div class="glossary-grid">
+      <div class="gloss-item">
+        <span class="gloss-term">Non-autoregressive</span>
+        <span class="gloss-def">A model that produces all outputs simultaneously in one step, rather than generating one token at a time and conditioning each on the previous. Makes classification dramatically faster.</span>
+      </div>
+      <div class="gloss-item">
+        <span class="gloss-term">System 1 (ML usage)</span>
+        <span class="gloss-def">Borrowed from cognitive science (Kahneman): fast, instinctive processing. In Laya's context: a single-pass decision made without deliberate multi-step reasoning.</span>
+      </div>
+      <div class="gloss-item">
+        <span class="gloss-term">Forward pass</span>
+        <span class="gloss-def">One complete pass of data through a neural network from input to output, producing predictions. In non-autoregressive models, one forward pass is all that's needed.</span>
+      </div>
+      <div class="gloss-item">
+        <span class="gloss-term">Checkpoint</span>
+        <span class="gloss-def">A saved snapshot of a trained model's weights, typically fine-tuned for a specific task or domain. Loading a checkpoint makes the model ready to run that task.</span>
+      </div>
+      <div class="gloss-item">
+        <span class="gloss-term">Router</span>
+        <span class="gloss-def">In Laya: a lightweight component that inspects each incoming request and selects the appropriate checkpoint to handle it, without the caller specifying the model.</span>
+      </div>
+      <div class="gloss-item">
+        <span class="gloss-term">Typed choice</span>
+        <span class="gloss-def">A classification task where the model picks exactly one label from a caller-supplied fixed set. Example: classify into ["positive", "negative", "neutral"].</span>
+      </div>
+      <div class="gloss-item">
+        <span class="gloss-term">Score (0–1)</span>
+        <span class="gloss-def">A continuous confidence value indicating how strongly a statement applies to a piece of text. 0 = not at all, 1 = completely. More granular than a binary yes/no.</span>
+      </div>
+      <div class="gloss-item">
+        <span class="gloss-term">Throughput</span>
+        <span class="gloss-def">The number of requests a system can successfully process per unit of time (e.g., 500 req/s). High throughput is the primary goal of laya-ultrafast.</span>
+      </div>
+      <div class="gloss-item">
+        <span class="gloss-term">Latency</span>
+        <span class="gloss-def">The time elapsed between sending a single request and receiving its response. A system can have low latency (fast per request) but still have low throughput if it can't handle many simultaneous requests.</span>
+      </div>
+      <div class="gloss-item">
+        <span class="gloss-term">Batching</span>
+        <span class="gloss-def">Grouping multiple inference requests together and processing them in a single GPU call. Improves throughput by amortizing the fixed overhead of each GPU invocation across many requests.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── OPEN QUESTIONS ── -->
+  <section id="verify" aria-labelledby="verify-heading">
+    <h2 id="verify-heading">Open Questions <span class="verify-badge">⚠️ Verify</span></h2>
+    <p class="section-intro">Items on this page that could not be confirmed from public repo metadata at time of writing. Verify these before production use.</p>
+
+    <details class="verify-panel" open>
+      <summary class="verify-summary">
+        <span>5 items to verify — expand for details</span>
+        <svg class="faq-chevron" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style="color:var(--accent-amber)"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>
+      </summary>
+      <div class="verify-body">
+        <ul class="verify-list">
+          <li>
+            <strong>Language count ("100+").</strong> The repo description says 100+ languages. Verify the actual supported language list and quality per language.
+            → <a href="https://github.com/NandhaKishorM/laya" target="_blank" rel="noopener">github.com/NandhaKishorM/laya</a>
+          </li>
+          <li>
+            <strong>HuggingFace checkpoint availability.</strong> Are Laya model weights publicly downloadable? Under what license?
+            → Search <a href="https://huggingface.co/NandhaKishorM" target="_blank" rel="noopener">huggingface.co/NandhaKishorM</a> or similar.
+          </li>
+          <li>
+            <strong>Exact task types and API surface.</strong> The choice / score / yes_no API shown on this page is illustrative. Verify actual method names, parameters, and response shapes.
+            → <a href="https://github.com/NandhaKishorM/laya" target="_blank" rel="noopener">github.com/NandhaKishorM/laya</a> README
+          </li>
+          <li>
+            <strong>jev-ultrafast origin.</strong> What is jev-ultrafast? Which project or author does it originate from?
+            → <a href="https://github.com/ipenywis/laya-ultrafast" target="_blank" rel="noopener">github.com/ipenywis/laya-ultrafast</a> README
+          </li>
+          <li>
+            <strong>laya-ultrafast optimization strategy.</strong> Does it use request batching? Dynamic batching? Something else? What are the real throughput benchmarks?
+            → <a href="https://github.com/ipenywis/laya-ultrafast" target="_blank" rel="noopener">github.com/ipenywis/laya-ultrafast</a> README
+          </li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ── FURTHER READING ── -->
+  <section id="links" aria-labelledby="links-heading">
+    <h2 id="links-heading">Further Reading</h2>
+    <p class="section-intro">Go deeper — straight to the source.</p>
+
+    <div class="links-grid">
+      <a href="https://github.com/NandhaKishorM/laya" target="_blank" rel="noopener" class="link-card">
+        <span class="link-icon">📦</span>
+        <span class="link-title">NandhaKishorM / laya</span>
+        <span class="link-desc">The primary Laya repo. README, installation, API docs, and checkpoint links.</span>
+      </a>
+      <a href="https://github.com/ipenywis/laya-ultrafast" target="_blank" rel="noopener" class="link-card">
+        <span class="link-icon">⚡</span>
+        <span class="link-title">ipenywis / laya-ultrafast</span>
+        <span class="link-desc">The ultrafast inference wrapper. Includes setup instructions and throughput benchmarks.</span>
+      </a>
+      <a href="https://huggingface.co/models?search=laya" target="_blank" rel="noopener" class="link-card">
+        <span class="link-icon">🤗</span>
+        <span class="link-title">HuggingFace — search "laya"</span>
+        <span class="link-desc">Find published Laya model checkpoints and weights. <span class="verify-badge">⚠️ Verify availability</span></span>
+      </a>
+      <a href="https://github.com/NandhaKishorM/laya/issues" target="_blank" rel="noopener" class="link-card">
+        <span class="link-icon">💬</span>
+        <span class="link-title">Laya GitHub Issues</span>
+        <span class="link-desc">Community questions, bug reports, and feature discussions — great for understanding real-world usage patterns.</span>
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>LAYA-EXPLAINER v1.0 · Built 2026-09-27 · <a href="#verify">5 open ⚠️VERIFY items</a> · All illustrative benchmarks must be replaced with real data from the repos.</p>
+  <p><a href="https://github.com/NandhaKishorM/laya" target="_blank" rel="noopener">laya</a> · <a href="https://github.com/ipenywis/laya-ultrafast" target="_blank" rel="noopener">laya-ultrafast</a></p>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ── THEME TOGGLE ── */
+  const html = document.documentElement;
+  const toggleBtn = document.getElementById('theme-toggle');
+  const themeIcon = document.getElementById('theme-icon');
+  const themeLabel = document.getElementById('theme-label');
+
+  function setTheme(t) {
+    html.setAttribute('data-theme', t);
+    themeIcon.textContent = t === 'dark' ? '☀️' : '🌙';
+    themeLabel.textContent = t === 'dark' ? 'Light' : 'Dark';
+    try { localStorage.setItem('laya-theme', t); } catch(e) {}
+  }
+
+  try {
+    const saved = localStorage.getItem('laya-theme');
+    if (saved) setTheme(saved);
+  } catch(e) {}
+
+  toggleBtn.addEventListener('click', function () {
+    setTheme(html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+
+  /* ── TABS ── */
+  document.querySelectorAll('[role="tablist"]').forEach(function (tablist) {
+    const buttons = tablist.querySelectorAll('[role="tab"]');
+    const panels  = tablist.parentElement.querySelectorAll('[role="tabpanel"]');
+
+    buttons.forEach(function (btn, i) {
+      btn.addEventListener('click', function () {
+        buttons.forEach(function (b) { b.setAttribute('aria-selected', 'false'); });
+        panels.forEach(function (p) { p.setAttribute('aria-hidden', 'true'); p.classList.remove('active'); });
+        btn.setAttribute('aria-selected', 'true');
+        const panel = document.getElementById(btn.getAttribute('aria-controls'));
+        if (panel) { panel.setAttribute('aria-hidden', 'false'); panel.classList.add('active'); }
+      });
+      btn.addEventListener('keydown', function (e) {
+        let idx = Array.from(buttons).indexOf(document.activeElement);
+        if (e.key === 'ArrowRight') { idx = (idx + 1) % buttons.length; buttons[idx].focus(); buttons[idx].click(); }
+        if (e.key === 'ArrowLeft')  { idx = (idx - 1 + buttons.length) % buttons.length; buttons[idx].focus(); buttons[idx].click(); }
+      });
+    });
+  });
+
+  /* ── COPY BUTTONS ── */
+  document.querySelectorAll('.copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const targetId = btn.getAttribute('data-copy');
+      const block = targetId ? document.getElementById(targetId) : btn.nextElementSibling;
+      if (!block) return;
+      const text = block.innerText || block.textContent || '';
+      navigator.clipboard.writeText(text).then(function () {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.color = 'var(--accent-green)';
+        setTimeout(function () { btn.textContent = orig; btn.style.color = ''; }, 2000);
+      }).catch(function () {
+        btn.textContent = 'Failed';
+        setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
+      });
+    });
+  });
+
+  /* ── CALCULATOR ── */
+  const nLabels   = document.getElementById('n-labels');
+  const tokenLen  = document.getElementById('token-len');
+  const nLabelsV  = document.getElementById('n-labels-val');
+  const tokenLenV = document.getElementById('token-len-val');
+  const layaLat   = document.getElementById('laya-lat');
+  const llmLat    = document.getElementById('llm-lat');
+  const speedup   = document.getElementById('speedup');
+  const callsSec  = document.getElementById('calls-sec');
+
+  function updateCalc() {
+    const n = parseInt(nLabels.value, 10);
+    const t = parseInt(tokenLen.value, 10);
+    nLabelsV.textContent = n;
+    tokenLenV.textContent = t;
+
+    // ILLUSTRATIVE formulas
+    const layaMs = Math.round(15 + t * 0.02);       // constant w.r.t. label count
+    const llmMs  = Math.round(200 + n * 12 + t * 2); // grows with label count
+    const sp     = (llmMs / layaMs).toFixed(1);
+    const rps    = Math.round(1000 / layaMs);
+
+    layaLat.textContent  = '~' + layaMs + ' ms';
+    llmLat.textContent   = '~' + llmMs + ' ms';
+    speedup.textContent  = sp + '×';
+    callsSec.textContent = rps + ' req/s';
+  }
+
+  if (nLabels && tokenLen) {
+    nLabels.addEventListener('input', updateCalc);
+    tokenLen.addEventListener('input', updateCalc);
+    updateCalc();
+  }
+
+  /* ── ACTIVE NAV ── */
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-links a');
+
+  function onScroll() {
+    let current = '';
+    sections.forEach(function (s) {
+      if (window.scrollY >= s.offsetTop - 120) current = s.id;
+    });
+    navLinks.forEach(function (a) {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+})();
+</script>
+</body>
+</html>
